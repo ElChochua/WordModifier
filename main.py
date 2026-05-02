@@ -1,13 +1,14 @@
-import tkinter as tk
-from tkinter import messagebox
-root = tk.Tk()
+import customtkinter
+from WordUtil.MyApp import MyApp
+from CTkMessagebox import CTkMessagebox
+import customtkinter
+root = customtkinter.CTk()
 
 def solve():
-    messagebox.showinfo('Pisos Picados', 'Mi casa')
-
+    CTkMessagebox(title="Error", message="No se ha seleccionado un archivo de plantilla.", icon="cancel", option_1="OK")
+#Spinbox = valores numericos, Entry = Texto al parecer #listbox eso, listas. Frame = contenedor tk.Text = text area
 def main():
-    print("donde caemos gente")
-    tk.Button(root, text="Picale pa decidir padrino", command=solve).pack()
+    app = MyApp(root)
     root.mainloop()
 
 
