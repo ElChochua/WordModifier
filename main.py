@@ -1,5 +1,5 @@
 import customtkinter
-from WordUtil.MyApp import MyApp
+from Util.MyApp import MyApp
 from CTkMessagebox import CTkMessagebox
 import customtkinter
 root = customtkinter.CTk()
