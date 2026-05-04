@@ -1,4 +1,3 @@
-
 from docx import Document
 from pypdf import PdfWriter, PdfReader
 import os
@@ -27,13 +26,15 @@ import pandas as pd
     # ─────────────────────────────────────────
 class FileManager:
     def __init__(self, template, output_folder, combined_pdf=False, markers=None):
-        self.template = template   # Ruta al archivo Word plantilla
+        self.template = template   # Ruta al archivo Word self.template
         self.output_folder = output_folder        # Carpeta donde se guardarán los .docx
         self.combined_pdf = combined_pdf          # Si True, también generará un PDF combinado de todas las cartas
         self.markers = markers  # Marcador de nombre en la carta
+    def __init__(self, template):
+        self.template = template   # Ruta al archivo Word self.template
 
 
-    def reemplazar_en_parrafo(parrafo, reemplazos):
+    def reemplazar_en_parrafo(self,parrafo, reemplazos):
         texto_completo = "".join(run.text for run in parrafo.runs)
         if not any(m in texto_completo for m in reemplazos):
             return
@@ -46,14 +47,14 @@ class FileManager:
                 run.text = ""
 
 
-    def reemplazar_en_doc(doc, reemplazos):
+    def reemplazar_en_doc(self, doc, reemplazos):
         for parrafo in doc.paragraphs:
-            reemplazar_en_parrafo(parrafo, reemplazos)
+            self.reemplazar_en_parrafo(parrafo, reemplazos)
         for tabla in doc.tables:
             for fila in tabla.rows:
                 for celda in fila.cells:
                     for parrafo in celda.paragraphs:
-                        reemplazar_en_parrafo(parrafo, reemplazos)
+                        self.reemplazar_en_parrafo(parrafo, reemplazos)
         for seccion in doc.sections:
             for contenedor in [
                 seccion.header, seccion.first_page_header, seccion.even_page_header,
@@ -62,29 +63,31 @@ class FileManager:
                 if contenedor is None:
                     continue
                 for parrafo in contenedor.paragraphs:
-                    reemplazar_en_parrafo(parrafo, reemplazos)
+                    self.reemplazar_en_parrafo(parrafo, reemplazos)
                 for tabla in contenedor.tables:
                     for fila in tabla.rows:
                         for celda in fila.cells:
                             for parrafo in celda.paragraphs:
-                                reemplazar_en_parrafo(parrafo, reemplazos)
+                                self.reemplazar_en_parrafo(parrafo, reemplazos)
 
 
-    def generar_carta(plantilla_path, nombre, genero, carpeta_salida):
+    def generar_carta(self,plantilla_path, name):
         doc = Document(plantilla_path)
-        replaces = {key, }
-        reemplazar_en_doc(doc, replaces)
-        nombre_archivo = nombre.replace(" ", "_").replace("/", "-")
-        ruta_salida = os.path.join(carpeta_salida, f"Carta_{nombre_archivo}.docx")
+
+        nombre_archivo = name.replace(" ", "_").replace("/", "-")
+        ruta_salida = os.path.join(self.output_folder, f"Carta_{nombre_archivo}.docx")
         doc.save(ruta_salida)
         return ruta_salida
 
+    def get_all_tables(self):
+        doc = Document(self.template)
+        return doc.tables
 
     # ─────────────────────────────────────────
     # Conversión a PDF y combinación
     # ─────────────────────────────────────────
 
-    def encontrar_libreoffice():
+    def encontrar_libreoffice(self):
         """Busca el ejecutable de LibreOffice en las rutas comunes."""
         candidatos = [
             "libreoffice",   # Linux / Mac (si está en PATH)
@@ -99,9 +102,9 @@ class FileManager:
         return None
 
 
-    def docx_a_pdf(ruta_docx, carpeta_pdf):
+    def docx_a_pdf(self, ruta_docx, carpeta_pdf):
         """Convierte un .docx a PDF usando LibreOffice y retorna la ruta del PDF."""
-        soffice = encontrar_libreoffice()
+        soffice = self.encontrar_libreoffice()
         if not soffice:
             raise EnvironmentError(
                 "LibreOffice no encontrado. Instálalo desde https://www.libreoffice.org/"
@@ -120,7 +123,7 @@ class FileManager:
         return os.path.join(carpeta_pdf, nombre_base + ".pdf")
 
 
-    def combinar_pdfs(carpeta_docx, ruta_pdf_final, orden_asesores):
+    def combinar_pdfs(self, carpeta_docx, ruta_pdf_final, orden_asesores):
         """
         Convierte todos los .docx a PDF (en el mismo orden que la lista de asesores)
         y los combina en un único archivo PDF.
@@ -141,7 +144,7 @@ class FileManager:
                 continue
 
             try:
-                ruta_pdf = docx_a_pdf(ruta_docx, carpeta_pdf_temp)
+                ruta_pdf = self.docx_a_pdf(ruta_docx, carpeta_pdf_temp)
                 reader = PdfReader(ruta_pdf)
                 for page in reader.pages:
                     writer.add_page(page)
@@ -163,39 +166,3 @@ class FileManager:
 
         paginas_totales = sum(len(PdfReader(ruta_pdf_final).pages) for _ in [1])
         print(f"\n✔ PDF combinado guardado: '{ruta_pdf_final}' ({paginas_totales} páginas)")
-
-
-    # ─────────────────────────────────────────
-    # Main
-    # ─────────────────────────────────────────
-
-
-        if not os.path.exists(PLANTILLA):
-            print(f"❌ No se encontró la plantilla: '{PLANTILLA}'")
-            print("   Asegúrate de que el archivo esté en la misma carpeta que este script.")
-            return
-
-        os.makedirs(CARPETA_SALIDA, exist_ok=True)
-
-        print(f"📄 Plantilla:      {PLANTILLA}")
-        print(f"📁 Carpeta salida: {CARPETA_SALIDA}")
-        print(f"📋 PDF combinado:  {PDF_COMBINADO}")
-        print(f"👥 Asesores:       {len(ASESORES)}\n")
-        print("Generando cartas Word...")
-        print("─" * 50)
-
-        errores_docx = []
-        for nombre, genero in ASESORES:
-            try:
-                generar_carta(PLANTILLA, nombre, genero, CARPETA_SALIDA)
-                print(f"  ✅  [{genero_a_titulo(genero):<12}]  {nombre}")
-            except Exception as e:
-                print(f"  ❌  {nombre}  →  {e}")
-                errores_docx.append((nombre, str(e)))
-
-        print("─" * 50)
-        generadas = len(ASESORES) - len(errores_docx)
-        print(f"\n✔ {generadas} cartas Word generadas en '{CARPETA_SALIDA}/'")
-
-        # Combinar en PDF
-        combinar_pdfs(CARPETA_SALIDA, PDF_COMBINADO, ASESORES)
