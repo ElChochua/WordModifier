@@ -12,10 +12,10 @@ def solve():
 #Spinbox = valores numericos, Entry = Texto al parecer #listbox eso, listas. Frame = contenedor tk.Text = text area
 def main():
     app = MyApp(root)
-    documento = "C:\\Users\\jossu\\Downloads\\IOS-Android_v0.2.docx"
-    dp = DataProcess(documento)
-    datasets = dp.read_data()
-    print(datasets)
+    # documento = "C:\\Users\\jossu\\Downloads\\IOS-Android_v0.2.docx"
+    #dp = DataProcess(documento)
+    #datasets = dp.read_data()
+    #print(datasets)
     root.mainloop()
 
 
