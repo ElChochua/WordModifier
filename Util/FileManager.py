@@ -69,9 +69,9 @@ class FileManager:
         doc = Document(template_path)
 
         file_name = name.replace(" ", "_").replace("/", "-")
-        ruta_salida = os.path.join(self.output_folder, f"Carta_{file_name}.docx")
-        doc.save(ruta_salida)
-        return ruta_salida
+        output_path = os.path.join(self.output_folder, f"Carta_{file_name}.docx")
+        doc.save(output_path)
+        return output_path
 
     def _safe_file_name(self, value):
         file_name = str(value).strip()
@@ -141,7 +141,7 @@ class FileManager:
         return None
 
 
-    def doc_to_pdf(self, ruta_docx, pdf_folder):
+    def doc_to_pdf(self, doc_path, pdf_folder):
 
         soffice = self.find_libreoffice()
         if not soffice:
@@ -150,15 +150,15 @@ class FileManager:
             )
 
         result = subprocess.run(
-            [soffice, "--headless", "--convert-to", "pdf", "--outdir", pdf_folder, ruta_docx],
+            [soffice, "--headless", "--convert-to", "pdf", "--outdir", pdf_folder, doc_path],
             capture_output=True,
             text=True,
         )
 
         if result.returncode != 0:
-            raise RuntimeError(f"Error al convertir {ruta_docx}:\n{result.stderr}")
+            raise RuntimeError(f"Error al convertir {doc_path}:\n{result.stderr}")
 
-        base_name = os.path.splitext(os.path.basename(ruta_docx))[0]
+        base_name = os.path.splitext(os.path.basename(doc_path))[0]
         return os.path.join(pdf_folder, base_name + ".pdf")
 
 
@@ -172,14 +172,14 @@ class FileManager:
 
         for name, _ in order_file:
             file_name = name.replace(" ", "_").replace("/", "-")
-            ruta_docx = os.path.join(docx_path, f"Carta_{file_name}.docx")
+            doc_path = os.path.join(docx_path, f"{file_name}.docx")
 
-            if not os.path.exists(ruta_docx):
-                print(f"  Not found: {os.path.basename(ruta_docx)}")
+            if not os.path.exists(doc_path):
+                print(f"  Not found: {os.path.basename(doc_path)}")
                 continue
 
             try:
-                ruta_pdf = self.doc_to_pdf(ruta_docx, pdf_folder_temp)
+                ruta_pdf = self.doc_to_pdf(doc_path, pdf_folder_temp)
                 reader = PdfReader(ruta_pdf)
                 for page in reader.pages:
                     writer.add_page(page)
