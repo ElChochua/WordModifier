@@ -10,10 +10,14 @@ from customtkinter import filedialog
 import customtkinter as ctt
 import pandas as pd
 from PIL import Image
+from tksheet import Sheet
+from Util.LanguageManager import LanguageManager
+from Util.FileManager import FileManager
+
 class MyApp:
     assets_path = path.abspath(path.join(path.dirname(__file__),'..', "assets"))
     markers = []
-    data = {}
+    data: pd.DataFrame = pd.DataFrame()
     def __init__(self, root):
         self.root = root
         self.root.title("DockGen")
@@ -26,8 +30,10 @@ class MyApp:
         self.root.grid_columnconfigure(0, weight=0, minsize=290) 
         self.root.grid_columnconfigure(1, weight=1)
         self.root.grid_rowconfigure(1, weight=1)
-        self.data =  []
-
+        self.markers = []
+        self.data = pd.DataFrame()
+        self.records_sheet = None
+        self.lang = LanguageManager()
         # Header frame
         self.header_frame = ctt.CTkFrame(master=self.root)
         
@@ -46,7 +52,7 @@ class MyApp:
         # Record control frame
         self.records_section_frame = ctt.CTkFrame(master=self.root )
         self.record_controll_frame = ctt.CTkFrame(master=self.records_section_frame )
-        self.records_frame = ctt.CTkScrollableFrame(master=self.records_section_frame )
+        self.records_frame = ctt.CTkFrame(master=self.records_section_frame )
         self.records_section_frame.columnconfigure(0, weight=1)
         self.records_section_frame.rowconfigure(1, weight=1)
         self.create_widgets()
@@ -54,13 +60,15 @@ class MyApp:
     def create_widgets(self):
         #header
         header_label = ctt.CTkLabel(master=self.header_frame, text="DocGen", font=ctt.CTkFont(size=24, weight="bold"))
-        unlock_doc_button = ctt.CTkButton(master=self.header_frame, text="Unlock Doc", command=lambda: CTkMessagebox(title="Error", message="No se ha seleccionado un archivo de plantilla.", icon="cancel", option_1="OK"))   
+        unlock_doc_button = ctt.CTkButton(master=self.header_frame, text=self.lang.get("unlock_document"), command=lambda: CTkMessagebox(title=self.lang.get("error"), message=self.lang.get("no_template_selected"), icon="cancel", option_1=self.lang.get("ok")))   
+        generate_docs_button = ctt.CTkButton(master=self.header_frame, text=self.lang.get("generate_documents"), command=self.generate_documents)
         #header full width
         self.header_frame.grid_columnconfigure(0, weight=1) 
         self.header_frame.grid_columnconfigure(1, weight=1)
         #label full on left and button full on right and the center a big gap between them responsive to the window size
         header_label.grid(row=0, column=0, padx=10, pady=10, sticky="w")
         unlock_doc_button.grid(row=0, column=1, padx=10, pady=10, sticky="e")
+        generate_docs_button.grid(row=0, column=2, padx=10, pady=10, sticky="e")
         self.header_frame.grid(row=0,column=0, sticky="ew", columnspan=2)
         
         #left frame
@@ -72,16 +80,20 @@ class MyApp:
         self.left_frame.grid(row=1, column=0, sticky="nsew")
         
         #template section 
-        select_file_button = ctt.CTkButton(master=self.template_section_frame, text="Select Doc", command=self.select_template)
-        select_file_label = ctt.CTkLabel(master=self.template_section_frame, text="Template")
+        select_file_button = ctt.CTkButton(master=self.template_section_frame, text=self.lang.get("select_template"), command=self.select_template)
+        select_file_label = ctt.CTkLabel(master=self.template_section_frame, text=self.lang.get("template"))
+        select_output_button = ctt.CTkButton(master=self.template_section_frame, text=self.lang.get("select_output_folder"), command=self.select_output)
+        select_output_label = ctt.CTkLabel(master=self.template_section_frame, text=self.lang.get("output_folder"))
 
 
         select_file_label.grid(row=0, column=0, padx=5, pady=5, sticky="w")
         select_file_button.grid(row=1, column=0, padx=5, pady=5)
+        select_output_label.grid(row=0, column=1, padx=5, pady=5, sticky="w")
+        select_output_button.grid(row=1, column=1, padx=5, pady=5)
         self.template_section_frame.grid(row=0, column=0, padx=5, pady=5, sticky="ew")
 
         #markers section
-        markers_label = ctt.CTkLabel(master=self.markers_section_frame, text="Markers")
+        markers_label = ctt.CTkLabel(master=self.markers_section_frame, text=self.lang.get("markers"))
         markers_entry = ctt.CTkEntry(master=self.markers_section_frame)
         markers_entry.bind("<Return>", lambda event: self.on_marker_entry(event))
         rotate_icon = ctt.CTkImage(light_image=Image.open(path.join(self.assets_path, "rotate_icon.png")),
@@ -102,9 +114,9 @@ class MyApp:
         #data section
         data_icon = ctt.CTkImage(light_image=Image.open(path.join(self.assets_path, "data_icon_white.png")), dark_image=Image.open(path.join(self.assets_path, "data_icon_black.png")), size=(20, 20))
         no_data_icon = ctt.CTkImage(light_image=Image.open(path.join(self.assets_path, "no_data_white.png")), dark_image=Image.open(path.join(self.assets_path, "no_data_black.png")), size=(20, 20))
-        data_import_label = ctt.CTkLabel(master=self.data_frame, text="Data")
-        data_import_button = ctt.CTkButton(master=self.data_frame, text="Import Data",image=data_icon, compound="left", command=self.import_data)
-        manual_data_button = ctt.CTkButton(master=self.data_frame, text="Add Data Manually", image=no_data_icon, compound="left", command=self.add_record_manually)
+        data_import_label = ctt.CTkLabel(master=self.data_frame, text=self.lang.get("data"))
+        data_import_button = ctt.CTkButton(master=self.data_frame, text=self.lang.get("import_data"), image=data_icon, compound="left", command=self.import_data)
+        manual_data_button = ctt.CTkButton(master=self.data_frame, text=self.lang.get("add_data_manually"), image=no_data_icon, compound="left", command=self.add_record_manually)
         '''when you click the "Add Data Manually" button, it will open a new window with a table. The table will have two columns: "Marker" and "Value". You can add as many rows as you want. When you click the "Save" button, it will save the data in a dictionary. The key of the dictionary will be the marker and the value of the dictionary will be the value you provided.'''
         data_import_label.grid(row=0, column=0)
         data_import_button.grid(row=1, column=0, padx=5, pady=5, sticky="w")
@@ -116,13 +128,12 @@ class MyApp:
         the records will be displayed in a listbox with a scrollbar, on top of the listbox there will be the markers associated with the record, and the data associated with the record. When you click on a record, it will show the markers and data associated with that record.'''
         #records section
 
-        records_label = ctt.CTkLabel(master=self.records_section_frame, text="Records", font=ctt.CTkFont(size=16, weight="bold"))
-        delete_all_records_button = ctt.CTkButton(master=self.records_section_frame, text="Delete All Records")
-        delete_all_records_button = ctt.CTkButton(master=self.records_section_frame, text="Clear All", command=self.remove_all_records)
-        delete_selected_record_button = ctt.CTkButton(master=self.records_section_frame, text="Delete Selected Record", command=self.remove_selected_records)
-
+        records_label = ctt.CTkLabel(master=self.records_section_frame, text=self.lang.get("records"), font=ctt.CTkFont(size=16, weight="bold"))
+        delete_all_records_button = ctt.CTkButton(master=self.records_section_frame, text=self.lang.get("delete_all_records"))
+        delete_all_records_button = ctt.CTkButton(master=self.records_section_frame, text=self.lang.get("clear_all"), command=self.remove_all_records)
+        remove_empty_rows_button = ctt.CTkButton(master=self.records_section_frame, text=self.lang.get("remove_empty_rows"), command=self.remove_empty_rows)
         delete_all_records_button.grid(row=0, column=1, padx=5, pady=5, sticky="e")
-        delete_selected_record_button.grid(row=0, column=2, padx=5, pady=5, sticky="e")
+        remove_empty_rows_button.grid(row=0, column=3, padx=5, pady=5, sticky="e")
         records_label.grid(row=0, column=0, padx=5, pady=5, sticky="w")
 
 
@@ -130,16 +141,68 @@ class MyApp:
         #records section
         #horizontal_scroll = ctt.CTkScrollbar(master=self.records_frame, orientation="horizontal")
         #horizontal_scroll.grid(row=1, column=0, sticky="ew")
-        self.records_frame.grid(row=1, column=0, columnspan=3, sticky="nsew")
+        self.records_frame.grid(row=1, column=0, columnspan=4, sticky="nsew")
+
+    def _sheet_theme_kwargs(self):
+        return {
+            "frame_bg": "#E5E5E5",
+            "table_bg": "#F8F8F8",
+            "table_fg": "#1F1F1F",
+            "table_grid_fg": "#D0D0D0",
+            "header_bg": "#D9D9D9",
+            "header_fg": "#1F1F1F",
+            "header_grid_fg": "#C4C4C4",
+            "index_bg": "#D9D9D9",
+            "index_fg": "#1F1F1F",
+            "index_grid_fg": "#C4C4C4",
+            "popup_menu_bg": "#F2F2F2",
+            "popup_menu_fg": "#1F1F1F",
+            "popup_menu_highlight_bg": "#CFCFCF",
+            "popup_menu_highlight_fg": "#1F1F1F",
+            "table_selected_cells_bg": "#CFE0F5",
+            "table_selected_cells_fg": "#1F1F1F",
+            "table_selected_cells_border_fg": "#7FA7D8",
+            "table_selected_rows_bg": "#DDEAF8",
+            "table_selected_rows_fg": "#1F1F1F",
+            "table_selected_rows_border_fg": "#7FA7D8",
+            "table_selected_columns_bg": "#DDEAF8",
+            "table_selected_columns_fg": "#1F1F1F",
+            "table_selected_columns_border_fg": "#7FA7D8",
+            "index_selected_rows_bg": "#DDEAF8",
+            "index_selected_rows_fg": "#1F1F1F",
+            "header_selected_columns_bg": "#7FA7D8",
+            "header_selected_columns_fg": "#FFFFFF",
+            "header_selected_cells_bg": "#CFE0F5",
+            "header_selected_cells_fg": "#1F1F1F",
+            "index_selected_cells_bg": "#CFE0F5",
+            "index_selected_cells_fg": "#1F1F1F",
+            "vertical_scroll_background": "#E5E5E5",
+            "horizontal_scroll_background": "#E5E5E5",
+            "vertical_scroll_troughcolor": "#F2F2F2",
+            "horizontal_scroll_troughcolor": "#F2F2F2",
+            "vertical_scroll_lightcolor": "#FFFFFF",
+            "horizontal_scroll_lightcolor": "#FFFFFF",
+            "vertical_scroll_darkcolor": "#A9A9A9",
+            "horizontal_scroll_darkcolor": "#A9A9A9",
+            "vertical_scroll_active_bg": "#BFBFBF",
+            "horizontal_scroll_active_bg": "#BFBFBF",
+            "vertical_scroll_not_active_bg": "#D0D0D0",
+            "horizontal_scroll_not_active_bg": "#D0D0D0",
+            "vertical_scroll_pressed_bg": "#B0B0B0",
+            "horizontal_scroll_pressed_bg": "#B0B0B0",
+            "outline_color": "#9A9A9A",
+            "drag_and_drop_bg": "#7FA7D8",
+            "resizing_line_fg": "#4A4A4A",
+        }
 
 
 
     def add_marker(self, marker):
         if marker in self.markers:
-            CTkMessagebox(title="Error", message="Marker already exists", icon="cancel")
+            CTkMessagebox(title="Error", message=self.lang.get("markers_exist").format(marker=marker), icon="cancel")
             return
         elif marker.strip() == "":
-            CTkMessagebox(title="Error", message="Marker cannot be empty", icon="cancel")
+            CTkMessagebox(title="Error", message=self.lang.get("marker_cannot_be_empty"), icon="cancel")
             return
         self.markers.append(marker)
         self.data[marker] = "" #add the marker as a column in the data with empty values
@@ -164,9 +227,8 @@ class MyApp:
     def remove_marker(self, marker):
         if marker in self.markers:
             self.markers.remove(marker)
-            #remove column from the data
-            #self.data.pop(marker)
-            self.data.drop(columns=marker, inplace=True)        
+            if marker in self.data.columns:
+                self.data.drop(columns=marker, inplace=True)
             print(f"Number of markers remaining: \n{(self.data)}")
             #remove button with marker name
 
@@ -176,9 +238,6 @@ class MyApp:
                     break
             self.update_markers_grid()
             self.update_record_table()
-            #remove data associated with the marker
-            if marker in self.data:
-                del self.data[marker]
 
     def remove_all_markers(self):
         for marker in self.markers[:]:
@@ -192,119 +251,86 @@ class MyApp:
         print(f"Number of markers: {(self.markers)}")
         event.widget.delete(0, tk.END)
 
-    def add_record(self):
-        #add the records as a table with the markers as columns and the data as values, each record will be a new row in the table from the data imported, if the data is a list of dictionaries, each dictionary will be a new record, if the data is a dictionary, it will be a single record
-        if isinstance(self.data, list):
-            for record in self.data:
-                if isinstance(record, dict):
-                    self.create_record(record)
-        elif isinstance(self.data, dict):
-            self.create_record(self.data)
-    def create_record(self, record):
-        record_frame = ctt.CTkFrame(master=self.records_frame)
-        for index, marker in enumerate(self.markers):
-            value = record.get(marker, "")
-            marker_label = ctt.CTkLabel(master=record_frame, text=f"{marker}: {value}")
-            marker_label.grid(row=0, column=index, padx=5, pady=5, sticky="w")
-        record_frame.pack(fill="x", padx=5, pady=5)
+    def _coerce_sheet_value(self, column_name, value):
+        if value is None:
+            return pd.NA
+
+        if isinstance(value, str):
+            value = value.strip()
+
+        if value == "":
+            return pd.NA
+
+        dtype = self.data[column_name].dtype
+
+        if pd.api.types.is_integer_dtype(dtype):
+            return int(value)
+        if pd.api.types.is_float_dtype(dtype):
+            return float(value)
+        return value
+
+    def _on_sheet_edit(self, event_data):
+        try:
+            row = event_data["row"]
+            column = event_data["column"]
+            value = event_data["value"]
+        except Exception:
+            return
+
+        if self.data is None or self.data.empty:
+            return
+
+        if row < 0 or column < 0 or row >= len(self.data.index) or column >= len(self.data.columns):
+            return
+
+        column_name = self.data.columns[column]
+        original_value = self.data.iat[row, column]
+
+        try:
+            self.data.iat[row, column] = self._coerce_sheet_value(column_name, value)
+        except (ValueError, TypeError):
+            CTkMessagebox(title="Error", message=f"Invalid Value Type. Expected {self.data[column_name].dtype}.", icon="cancel", option_1="OK")
+            self.records_sheet.set_cell_data(row, column, "" if pd.isna(original_value) else original_value, redraw=False)
+            self.records_sheet.refresh()
+            return
+
     def update_record_table(self):
             for widget in self.records_frame.winfo_children():
                 widget.destroy()
 
             if self.data is None or self.data.empty:
+                self.records_sheet = None
+                empty_label = ctt.CTkLabel(master=self.records_frame, text="No records loaded")
+                empty_label.grid(row=0, column=0, sticky="nsew", padx=5, pady=5)
+                self.records_frame.grid_columnconfigure(0, weight=1)
+                self.records_frame.grid_rowconfigure(0, weight=1)
                 return
 
-            self.records_frame.configure(fg_color=("gray75", "gray30"))
+            self.records_frame.grid_columnconfigure(0, weight=1)
+            self.records_frame.grid_rowconfigure(0, weight=1)
 
-            columns = ["Sel"] + [str(marker) for marker in self.markers]
-            
-            for j, col_name in enumerate(columns):
-                header_lbl = ctt.CTkLabel(
-                    master=self.records_frame, 
-                    text=col_name.upper(), 
-                    font=ctt.CTkFont(weight="bold", size=13),
-                    fg_color=("gray60", "gray20"), 
-                    text_color=("black", "white"),
-                    corner_radius=0,
-                    height=35
-                )
-                header_lbl.grid(row=0, column=j, sticky="nsew", padx=1, pady=1)
-                
+            sheet_data = self.data.fillna("").astype(str).values.tolist()
+            headers = [str(marker) for marker in self.data.columns]
 
-                if j == 0:
-                    self.records_frame.grid_columnconfigure(j, weight=0, minsize=40) # Columna de Checkbox pequeña
-                else:
-                    self.records_frame.grid_columnconfigure(j, weight=1, uniform="columnas_datos")
-
-            self.check_vars = [] 
-
-            for i, (index, row) in enumerate(self.data.iterrows()):
-                actual_row = i + 1
-                
-                if i % 2 == 0:
-                    row_color = ("#F9F9F9", "#2B2B2B")
-                else:
-                    row_color = ("#EFEFEF", "#212121")
-                
-                var = ctt.BooleanVar()
-                self.check_vars.append((index, var))
-                
-                cb_frame = ctt.CTkFrame(master=self.records_frame, fg_color=row_color, corner_radius=0)
-                cb_frame.grid(row=actual_row, column=0, sticky="nsew", padx=1, pady=1)
-                
-                cb = ctt.CTkCheckBox(master=cb_frame, text="", variable=var, width=20)
-                cb.pack(pady=5, padx=10)
-
-                for j, value in enumerate(row):
-                    raw_text = "" if pd.isna(value) else str(value).replace("\n", " ")
-                    
-                    display_text = raw_text[:45] + "..." if len(raw_text) > 45 else raw_text
-
-                    data_cell = ctt.CTkEntry(
-                        master=self.records_frame, 
-                        fg_color=row_color,
-                        text_color=("black", "white"),
-                        corner_radius=0,
-                        height=30
-                    )
-                    data_cell.insert(0, display_text)
-                    data_cell.bind("<Return>", lambda event, r=index, c=self.data.columns[j]: self.edit_cell(event, r, c))
-                    data_cell.grid(row=actual_row, column=j+1, sticky="nsew", padx=1, pady=1)         
-
-    def edit_cell(self, event, row_index, column_name):
-        new_value = event.widget.get().strip()
-        original_value = self.data.at[row_index, column_name]
-
-        col_dtype = self.data[column_name].dtype
-
-        try:
-            if new_value == "":
-                self.data.at[row_index, column_name] = pd.NA
-                
-            elif pd.api.types.is_integer_dtype(col_dtype):
-                self.data.at[row_index, column_name] = int(new_value)
-                
-            elif pd.api.types.is_float_dtype(col_dtype):
-                self.data.at[row_index, column_name] = float(new_value)
-                
-            else:
-                self.data.at[row_index, column_name] = new_value
-
-        except ValueError:
-            CTkMessagebox(title="Error", message=f"Invalid Value Type. Expected {col_dtype}.", icon="cancel", option_1="OK")
-            
-            event.widget.delete(0, tk.END)
-            safe_val = "" if pd.isna(original_value) else str(original_value)
-            event.widget.insert(0, safe_val)
-            return
-
-        print(f"Updated cell at row {row_index}, column '{column_name}' to '{new_value}'")
-        # print(self.data) # Opcional: comentar para no saturar la consola
-        self.update_record_table()
+            self.records_sheet = Sheet(
+                self.records_frame,
+                data=sheet_data,
+                headers=headers,
+                show_row_index=False,
+                show_header=True,
+                show_x_scrollbar=True,
+                show_y_scrollbar=True,
+                **self._sheet_theme_kwargs(),
+            )
+            self.records_sheet.grid(row=0, column=0, sticky="nsew")
+            self.records_sheet.basic_bindings(True)
+            self.records_sheet.extra_bindings("end_edit_cell", self._on_sheet_edit)
+            self.records_sheet.enable_bindings()
+            self.records_sheet.refresh()
 
 
     def select_template(self):
-        file = filedialog.askopenfilename(title="Select Template", filetypes=[("Word Documents", "*.docx")])
+        file = filedialog.askopenfilename(title=self.lang.get("select_template"), filetypes=[("Word Documents", "*.docx")])
         if file:
             self.doc_path = file
             template_name_entry = ctt.CTkEntry(master=self.template_section_frame)
@@ -313,7 +339,15 @@ class MyApp:
             template_name_entry.configure(state="readonly")
             template_name_entry.grid(row=2, column=0, padx=5, pady=5, sticky="ew")
             print(f"Selected template: {self.doc_path}")
-
+    def select_output(self):
+        folder = filedialog.askdirectory(title=self.lang.get("select_output_folder"))
+        if folder:
+            self.output_folder = folder
+            output_folder_entry = ctt.CTkEntry(master=self.template_section_frame)
+            output_folder_entry.insert(0, f"{path.basename(folder)}")
+            output_folder_entry.configure(state="readonly")
+            output_folder_entry.grid(row=2, column=1, padx=5, pady=5, sticky="ew")
+            print(f"Selected output folder: {self.output_folder}")
     def import_data(self):
             data_file = filedialog.askopenfilename(title="Select Data File", filetypes=[("Data Files", ("*.csv", "*.xlsx", "*.json", "*.docx")), ("All Files", "*.*")])
             
@@ -323,7 +357,7 @@ class MyApp:
             self.data_path = data_file
             ext = data_file.split(".")[-1].lower()
             if ext == "xlsx":
-                input_dialog = customtkinter.CTkInputDialog(title="Select Table", text="Excel File Detected. Please enter the row number of the table you want to use:")
+                input_dialog = customtkinter.CTkInputDialog(title=self.lang.get("excel_detected"), text=self.lang.get("excel_file_row_input"))
                 row_input = input_dialog.get_input()
                 if row_input is None: return 
                 
@@ -334,7 +368,7 @@ class MyApp:
                     self.data = data.loc[:, ~data.columns.astype(str).str.contains("^Unnamed")]
                     
                 except ValueError:
-                    CTkMessagebox(title="Error", message="Invalid table number. Please enter a valid integer.", icon="cancel", option_1="OK")
+                    CTkMessagebox(title="Error", message=self.lang.get("invalid_number"), icon="cancel", option_1="OK")
                     return
                 
             elif ext == "docx":
@@ -362,7 +396,7 @@ class MyApp:
                 self.markers = list(self.data.columns)
                 self.update_markers_grid()
             if self.data is None or len(self.data) <= 0:
-                CTkMessagebox(title="Error", message="Failed to read data from the file. This may be due to an unsupported file format or cannot read any data.", icon="cancel", option_1="OK")
+                CTkMessagebox(title="Error", message=self.lang.get("read_data_error"), icon="cancel", option_1="OK")
                 return
             if len(self.data) > 0:
                 self.data.columns = [str(col).strip().replace(" ", "_") for col in self.data.columns]
@@ -371,7 +405,7 @@ class MyApp:
 
             self.update_record_table()
             #remove empty columns button
-            remove_empty_columns_button = ctt.CTkButton(master=self.data_frame, text="Remove Empty Columns", command=self.remove_empty_columns)
+            remove_empty_columns_button = ctt.CTkButton(master=self.data_frame, text=self.lang.get("remove_empty_columns"), command=self.remove_empty_columns)
             remove_empty_columns_button.grid(row=2, column=1, padx=5, pady=5, sticky="w")
             
             # Mostramos el nombre del archivo en la UI
@@ -388,15 +422,28 @@ class MyApp:
             self.markers = list(self.data.columns)
             self.update_markers_grid()
             self.update_record_table()
+    def remove_empty_rows(self):
+        if self.data is not None and not self.data.empty:
+            #replace the empty values with nan
+            self.data.replace("", pd.NA, inplace=True)
+            self.data.dropna( how='all', inplace=True)    
+            self.data.dropna(axis=1, how='all', inplace=True)
+            self.markers = list(self.data.columns)
+            self.update_markers_grid()
+            self.update_record_table()
+
     def remove_all_records(self):
         self.data = pd.DataFrame() 
         self.update_record_table()
     
     def add_record_manually(self):
+        if(self.markers is None or len(self.markers) == 0):
+            CTkMessagebox(title="Error", message=self.lang.get("no_markers_available"), icon="cancel", option_1="OK")
+            return
         #open a new window with a table to add the data manually, the table will have two columns: "Marker" and "Value", and a button to save the data, when you click the button, it will save the data in a dictionary, the key of the dictionary will be the marker and the value of the dictionary will be the value you provided
         manual_data_window = ctt.CTkToplevel(self.root)
         manual_data_window.title("Add Data Manually")
-        manual_data_window.geometry("400x300")
+        manual_data_window.geometry("400x400")
         manual_data_window.grid_columnconfigure(0, weight=1)
         manual_data_window.grid_rowconfigure(0, weight=1)
         table_frame = ctt.CTkScrollableFrame(manual_data_window)
@@ -404,8 +451,8 @@ class MyApp:
         table_frame.grid_columnconfigure(0, weight=1)
         table_frame.grid_columnconfigure(1, weight=1)
         table_frame.grid_rowconfigure(0, weight=0)
-        marker_label = ctt.CTkLabel(table_frame, text="Marker", font=ctt.CTkFont(weight="bold"))
-        value_label = ctt.CTkLabel(table_frame, text="Value", font=ctt.CTkFont(weight="bold"))
+        marker_label = ctt.CTkLabel(table_frame, text=self.lang.get("marker"), font=ctt.CTkFont(weight="bold"))
+        value_label = ctt.CTkLabel(table_frame, text=self.lang.get("value"), font=ctt.CTkFont(weight="bold"))
         marker_label.grid(row=0, column=0, padx=5, pady=5)
         value_label.grid(row=0, column=1, padx=5, pady=5)
         entries = []
@@ -417,6 +464,9 @@ class MyApp:
             entries.append((marker, value_entry))
 
         def save_manual_data():
+            if(self.data is None) or self.markers is None or len(self.markers) == 0:
+                CTkMessagebox(title="Error", message=self.lang.get("no_markers_available"), icon="cancel", option_1="OK")
+                return
             #insert the new values into the data
             new_record_df = pd.DataFrame(columns=self.markers)
             for marker, entry in entries:
@@ -429,14 +479,34 @@ class MyApp:
         save_button = ctt.CTkButton(manual_data_window, text="Save", command=save_manual_data)
         save_button.grid(row=1, column=0, padx=10, pady=10, sticky="e")
         self.update_record_table()
+
     def remove_selected_records(self):
-        selected_indices = [index for index, var in self.check_vars if var.get()]
-        if not selected_indices:
-            CTkMessagebox(title="Error", message="No records selected. Please select at least one record to delete.", icon="cancel", option_1="OK")
+        if self.records_sheet is None or self.data is None or self.data.empty:
+            CTkMessagebox(title="Error", message=self.lang.get("no_records_loaded"), icon="cancel", option_1="OK")
             return
-        print(f"Selected indices for deletion: {selected_indices}")
-        confirm = CTkMessagebox(title="Confirm Deletion", message=f"Are you sure you want to delete {len(selected_indices)} selected record(s)?", icon="warning", option_2="No", option_1="Yes")
-        if confirm.get() == "Yes":
-            self.data.drop(index=selected_indices, inplace=True)
+
+        selected_rows = sorted(self.records_sheet.get_selected_rows())
+        if not selected_rows:
+            CTkMessagebox(title="Error", message=self.lang.get("no_records_selected"), icon="cancel", option_1="OK")
+            return
+        print(f"Selected indices for deletion: {selected_rows}")
+        confirm = CTkMessagebox(title=self.lang.get("confirm_deletion"), message=self.lang.get("confirm_deletion_message").format(num_records=len(selected_rows)), icon="warning", option_2=self.lang.get("no"), option_1=self.lang.get("yes"))
+        if confirm.get() == self.lang.get("yes"):
+            self.data.drop(index=selected_rows, inplace=True)
             self.data.reset_index(drop=True, inplace=True)
             self.update_record_table()
+
+    def generate_documents(self):
+        if self.doc_path is None:
+            CTkMessagebox(title="Error", message=self.lang.get("no_template_selected"), icon="cancel", option_1="OK")
+            return
+        if self.data is None or self.data.empty:
+            CTkMessagebox(title="Error", message=self.lang.get("no_data_loaded"), icon="cancel", option_1="OK")
+            return
+        if not getattr(self, "output_folder", None):
+            CTkMessagebox(title="Error", message="Select an output folder first.", icon="cancel", option_1="OK")
+            return
+        #generate the documents using the template and the data, and save them in the output folder
+        file_manager = FileManager(template=self.doc_path, output_folder=self.output_folder, markers=self.markers)
+        generated_files = file_manager.generate_documents(self.data)
+        CTkMessagebox(title="Success", message=f"Generated {len(generated_files)} document(s).", icon="check", option_1="OK")

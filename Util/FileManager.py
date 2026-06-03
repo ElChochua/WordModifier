@@ -20,75 +20,114 @@ import pandas as pd
         Mac:      brew install --cask libreoffice
         Linux:    sudo apt install libreoffice
 """
-
-    # ─────────────────────────────────────────
-    # CONFIGURACIÓN — edita estos valores
-    # ─────────────────────────────────────────
 class FileManager:
-    def __init__(self, template, output_folder, combined_pdf=False, markers=None):
-        self.template = template   # Ruta al archivo Word self.template
-        self.output_folder = output_folder        # Carpeta donde se guardarán los .docx
-        self.combined_pdf = combined_pdf          # Si True, también generará un PDF combinado de todas las cartas
-        self.markers = markers  # Marcador de nombre en la carta
-    def __init__(self, template):
-        self.template = template   # Ruta al archivo Word self.template
+    def __init__(self, template, output_folder=None, combined_pdf=False, markers=None):
+        self.template = template
+        self.output_folder = output_folder
+        self.combined_pdf = combined_pdf
+        self.markers = markers
 
 
-    def reemplazar_en_parrafo(self,parrafo, reemplazos):
-        texto_completo = "".join(run.text for run in parrafo.runs)
-        if not any(m in texto_completo for m in reemplazos):
+    def replace_on_paragraph(self,paragraph, replacement):
+        full_text = "".join(run.text for run in paragraph.runs)
+        if not any(m in full_text for m in replacement):
             return
-        texto_nuevo = texto_completo
-        for marcador, valor in reemplazos.items():
-            texto_nuevo = texto_nuevo.replace(marcador, valor)
-        if parrafo.runs:
-            parrafo.runs[0].text = texto_nuevo
-            for run in parrafo.runs[1:]:
+        new_text = full_text
+        for marker, value in replacement.items():
+            new_text = new_text.replace(marker, value)
+        if paragraph.runs:
+            paragraph.runs[0].text = new_text
+            for run in paragraph.runs[1:]:
                 run.text = ""
 
 
-    def reemplazar_en_doc(self, doc, reemplazos):
-        for parrafo in doc.paragraphs:
-            self.reemplazar_en_parrafo(parrafo, reemplazos)
-        for tabla in doc.tables:
-            for fila in tabla.rows:
-                for celda in fila.cells:
-                    for parrafo in celda.paragraphs:
-                        self.reemplazar_en_parrafo(parrafo, reemplazos)
-        for seccion in doc.sections:
-            for contenedor in [
-                seccion.header, seccion.first_page_header, seccion.even_page_header,
-                seccion.footer, seccion.first_page_footer, seccion.even_page_footer,
+    def replace_in_doc(self, doc, replacement):
+        for paragraph in doc.paragraphs:
+            self.replace_on_paragraph(paragraph, replacement)
+        for table in doc.tables:
+            for row in table.rows:
+                for cell in row.cells:
+                    for paragraph in cell.paragraphs:
+                        self.replace_on_paragraph(paragraph, replacement)
+        for section in doc.sections:
+            for container in [
+                section.header, section.first_page_header, section.even_page_header,
+                section.footer, section.first_page_footer, section.even_page_footer,
             ]:
-                if contenedor is None:
+                if container is None:
                     continue
-                for parrafo in contenedor.paragraphs:
-                    self.reemplazar_en_parrafo(parrafo, reemplazos)
-                for tabla in contenedor.tables:
-                    for fila in tabla.rows:
-                        for celda in fila.cells:
-                            for parrafo in celda.paragraphs:
-                                self.reemplazar_en_parrafo(parrafo, reemplazos)
+                for paragraph in container.paragraphs:
+                    self.replace_on_paragraph(paragraph, replacement)
+                for table in container.tables:
+                    for row in table.rows:
+                        for cell in row.cells:
+                            for paragraph in cell.paragraphs:
+                                self.replace_on_paragraph(paragraph, replacement)
 
 
-    def generar_carta(self,plantilla_path, name):
-        doc = Document(plantilla_path)
+    def generate_doc(self,template_path, name):
+        doc = Document(template_path)
 
-        nombre_archivo = name.replace(" ", "_").replace("/", "-")
-        ruta_salida = os.path.join(self.output_folder, f"Carta_{nombre_archivo}.docx")
+        file_name = name.replace(" ", "_").replace("/", "-")
+        ruta_salida = os.path.join(self.output_folder, f"Carta_{file_name}.docx")
         doc.save(ruta_salida)
         return ruta_salida
+
+    def _safe_file_name(self, value):
+        file_name = str(value).strip()
+        if not file_name:
+            file_name = "documento"
+        return file_name.replace(" ", "_").replace("/", "-").replace("\\", "-")
+
+    def _row_replacement(self, row):
+        if self.markers:
+            columns = [marker for marker in self.markers if marker in row.index]
+        else:
+            columns = list(row.index)
+
+        replacement = {}
+        for column in columns:
+            value = row[column]
+            replacement[str(column)] = "" if pd.isna(value) else str(value)
+        return replacement
+
+    def generate_documents(self, data, filename_column=None):
+        if self.output_folder is None:
+            raise ValueError("output_folder is required to generate documents")
+
+        if not isinstance(data, pd.DataFrame):
+            raise TypeError("data must be a pandas DataFrame")
+
+        if data.empty:
+            return []
+
+        os.makedirs(self.output_folder, exist_ok=True)
+
+        generated_files = []
+        for row_index, (_, row) in enumerate(data.iterrows()):
+            replacement = self._row_replacement(row)
+            doc = Document(self.template)
+            self.replace_in_doc(doc, replacement)
+
+            if filename_column and filename_column in row.index:
+                base_name = self._safe_file_name(row[filename_column])
+            elif self.markers and self.markers[0] in row.index:
+                base_name = self._safe_file_name(row[self.markers[0]])
+            else:
+                base_name = f"row_{row_index + 1}"
+
+            output_path = os.path.join(self.output_folder, f"Carta_{base_name}.docx")
+            doc.save(output_path)
+            generated_files.append(output_path)
+
+        return generated_files
 
     def get_all_tables(self):
         doc = Document(self.template)
         return doc.tables
 
-    # ─────────────────────────────────────────
-    # Conversión a PDF y combinación
-    # ─────────────────────────────────────────
+    def find_libreoffice(self):
 
-    def encontrar_libreoffice(self):
-        """Busca el ejecutable de LibreOffice en las rutas comunes."""
         candidatos = [
             "libreoffice",   # Linux / Mac (si está en PATH)
             "soffice",       # alternativo en PATH
@@ -102,67 +141,62 @@ class FileManager:
         return None
 
 
-    def docx_a_pdf(self, ruta_docx, carpeta_pdf):
-        """Convierte un .docx a PDF usando LibreOffice y retorna la ruta del PDF."""
-        soffice = self.encontrar_libreoffice()
+    def doc_to_pdf(self, ruta_docx, pdf_folder):
+
+        soffice = self.find_libreoffice()
         if not soffice:
             raise EnvironmentError(
                 "LibreOffice no encontrado. Instálalo desde https://www.libreoffice.org/"
             )
 
-        resultado = subprocess.run(
-            [soffice, "--headless", "--convert-to", "pdf", "--outdir", carpeta_pdf, ruta_docx],
+        result = subprocess.run(
+            [soffice, "--headless", "--convert-to", "pdf", "--outdir", pdf_folder, ruta_docx],
             capture_output=True,
             text=True,
         )
 
-        if resultado.returncode != 0:
-            raise RuntimeError(f"Error al convertir {ruta_docx}:\n{resultado.stderr}")
+        if result.returncode != 0:
+            raise RuntimeError(f"Error al convertir {ruta_docx}:\n{result.stderr}")
 
-        nombre_base = os.path.splitext(os.path.basename(ruta_docx))[0]
-        return os.path.join(carpeta_pdf, nombre_base + ".pdf")
+        base_name = os.path.splitext(os.path.basename(ruta_docx))[0]
+        return os.path.join(pdf_folder, base_name + ".pdf")
 
 
-    def combinar_pdfs(self, carpeta_docx, ruta_pdf_final, orden_asesores):
-        """
-        Convierte todos los .docx a PDF (en el mismo orden que la lista de asesores)
-        y los combina en un único archivo PDF.
-        """
-        print("\n📑 Combinando cartas en un solo PDF...")
-        carpeta_pdf_temp = os.path.join(carpeta_docx, "_pdfs_temp")
-        os.makedirs(carpeta_pdf_temp, exist_ok=True)
+    def merge_pdfs(self, docx_path, pdf_final_path, order_file):
+
+        pdf_folder_temp = os.path.join(docx_path, "_pdfs_temp")
+        os.makedirs(pdf_folder_temp, exist_ok=True)
 
         writer = PdfWriter()
         errores = []
 
-        for nombre, _ in orden_asesores:
-            nombre_archivo = nombre.replace(" ", "_").replace("/", "-")
-            ruta_docx = os.path.join(carpeta_docx, f"Carta_{nombre_archivo}.docx")
+        for name, _ in order_file:
+            file_name = name.replace(" ", "_").replace("/", "-")
+            ruta_docx = os.path.join(docx_path, f"Carta_{file_name}.docx")
 
             if not os.path.exists(ruta_docx):
-                print(f"  ⚠️  No encontrado, omitido: {os.path.basename(ruta_docx)}")
+                print(f"  Not found: {os.path.basename(ruta_docx)}")
                 continue
 
             try:
-                ruta_pdf = self.docx_a_pdf(ruta_docx, carpeta_pdf_temp)
+                ruta_pdf = self.doc_to_pdf(ruta_docx, pdf_folder_temp)
                 reader = PdfReader(ruta_pdf)
                 for page in reader.pages:
                     writer.add_page(page)
-                print(f"  ✅  {nombre}")
+                print(f"{name}")
             except Exception as e:
-                print(f"  ❌  {nombre}  →  {e}")
-                errores.append((nombre, str(e)))
+                print(f"  {name}  →  {e}")
+                errores.append((name, str(e)))
 
-        with open(ruta_pdf_final, "wb") as f:
+        with open(pdf_final_path, "wb") as f:
             writer.write(f)
 
-        # Limpiar PDFs temporales
-        shutil.rmtree(carpeta_pdf_temp, ignore_errors=True)
+        shutil.rmtree(pdf_folder_temp, ignore_errors=True)
 
         if errores:
-            print(f"\n  ⚠️  {len(errores)} carta(s) no se pudieron convertir:")
-            for nombre, err in errores:
-                print(f"     • {nombre}: {err}")
+            print(f"\n {len(errores)}")
+            for name, err in errores:
+                print(f"     • {name}: {err}")
 
-        paginas_totales = sum(len(PdfReader(ruta_pdf_final).pages) for _ in [1])
-        print(f"\n✔ PDF combinado guardado: '{ruta_pdf_final}' ({paginas_totales} páginas)")
+        paginas_totales = sum(len(PdfReader(pdf_final_path).pages) for _ in [1])
+        print(f"\n saved on '{pdf_final_path}' ({paginas_totales} pages)")
