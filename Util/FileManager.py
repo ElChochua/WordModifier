@@ -1,9 +1,7 @@
 from docx import Document
 from pypdf import PdfWriter, PdfReader
 import os
-import glob
 import subprocess
-import sys
 import shutil
 import pandas as pd
 """
@@ -116,7 +114,7 @@ class FileManager:
             else:
                 base_name = f"row_{row_index + 1}"
 
-            output_path = os.path.join(self.output_folder, f"Carta_{base_name}.docx")
+            output_path = os.path.join(self.output_folder, f"Document_{base_name}.docx")
             doc.save(output_path)
             generated_files.append(output_path)
 

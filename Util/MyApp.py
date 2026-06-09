@@ -26,7 +26,6 @@ class MyApp:
         self.root.resizable(True,True)
         self.root._set_appearance_mode("light") #default
         self.doc_path = None
-        self.data_path = None
         self.root.grid_columnconfigure(0, weight=0, minsize=290) 
         self.root.grid_columnconfigure(1, weight=1)
         self.root.grid_rowconfigure(1, weight=1)
@@ -49,6 +48,8 @@ class MyApp:
         
         # Data Frame
         self.data_frame = ctt.CTkFrame(master=self.left_frame )
+        self.extract_from_markers_checkbox = ctt.CTkCheckBox(master=self.data_frame, text="", command=lambda: ())
+
         # Record control frame
         self.records_section_frame = ctt.CTkFrame(master=self.root )
         self.record_controll_frame = ctt.CTkFrame(master=self.records_section_frame )
@@ -117,10 +118,13 @@ class MyApp:
         data_import_label = ctt.CTkLabel(master=self.data_frame, text=self.lang.get("data"))
         data_import_button = ctt.CTkButton(master=self.data_frame, text=self.lang.get("import_data"), image=data_icon, compound="left", command=self.import_data)
         manual_data_button = ctt.CTkButton(master=self.data_frame, text=self.lang.get("add_data_manually"), image=no_data_icon, compound="left", command=self.add_record_manually)
+        extract_from_markers_label = ctt.CTkLabel(master=self.data_frame, text=self.lang.get("extract_from_markers"))
         '''when you click the "Add Data Manually" button, it will open a new window with a table. The table will have two columns: "Marker" and "Value". You can add as many rows as you want. When you click the "Save" button, it will save the data in a dictionary. The key of the dictionary will be the marker and the value of the dictionary will be the value you provided.'''
         data_import_label.grid(row=0, column=0)
         data_import_button.grid(row=1, column=0, padx=5, pady=5, sticky="w")
         manual_data_button.grid(row=2, column=0, padx=5, pady=5, sticky="w")
+        extract_from_markers_label.grid(row=3, column=0, padx=5, pady=5, sticky="w")
+        self.extract_from_markers_checkbox.grid(row=3, column=1, padx=5, pady=5, sticky="w")
         self.data_frame.grid(row=2, column=0, padx=5, pady=5, sticky="ew")
 
         #record control section
@@ -196,7 +200,8 @@ class MyApp:
         }
 
 
-
+    def extract_checkbox_changed(self):
+        return self.extract_from_markers_checkbox.get()        
     def add_marker(self, marker):
         if marker in self.markers:
             CTkMessagebox(title="Error", message=self.lang.get("markers_exist").format(marker=marker), icon="cancel")
@@ -349,70 +354,99 @@ class MyApp:
             output_folder_entry.grid(row=2, column=1, padx=5, pady=5, sticky="ew")
             print(f"Selected output folder: {self.output_folder}")
     def import_data(self):
-            data_file = filedialog.askopenfilename(title="Select Data File", filetypes=[("Data Files", ("*.csv", "*.xlsx", "*.json", "*.docx")), ("All Files", "*.*")])
-            
-            if not data_file:
-                return 
-    
-            self.data_path = data_file
-            ext = data_file.split(".")[-1].lower()
+        if self.extract_checkbox_changed() and not self.markers:
+            CTkMessagebox(title="Error", message=self.lang.get("no_markers_available"), icon="cancel", option_1="OK")
+            return
+        data_file = list(filedialog.askopenfilenames(title="Select Data File", filetypes=[("Data Files", ("*.csv", "*.xlsx", "*.docx")), ("All Files", "*.*")]))
+
+        if not data_file:
+            return
+
+
+        for item in data_file:
+            ext = item.split(".")[-1].lower()
+            imported_data = None
+
             if ext == "xlsx":
-                input_dialog = customtkinter.CTkInputDialog(title=self.lang.get("excel_detected"), text=self.lang.get("excel_file_row_input"))
+                filename = path.basename(item)
+                input_dialog = customtkinter.CTkInputDialog(title=self.lang.get("excel_detected"), text=f"Name: {filename}\n {self.lang.get('excel_file_row_input')}:")
                 row_input = input_dialog.get_input()
-                if row_input is None: return 
-                
+                if row_input is None:
+                    return
+
                 try:
                     table_number = int(row_input)
-                    data = DataProcess.read_data(data_file, skiprows=table_number-1)
-                    
-                    self.data = data.loc[:, ~data.columns.astype(str).str.contains("^Unnamed")]
-                    
+                    imported_data = DataProcess.get_data(item, skiprows=table_number - 1)
                 except ValueError:
                     CTkMessagebox(title="Error", message=self.lang.get("invalid_number"), icon="cancel", option_1="OK")
                     return
-                
+            # If the file is a DOCX, let the user choose the table to import.
             elif ext == "docx":
-                raw_data = DataProcess.read_data(data_file)
-                
-                if len(raw_data) > 1:
-                    selector = TableSelector(self.root, raw_data)
-                    self.root.wait_window(selector)
-                    target_index = selector.selected_index
+                if self.extract_checkbox_changed():
+                    raw_data = DataProcess.get_data(item, from_markers=self.markers)
                     
-                    if target_index is None: 
-                        return 
+                    if raw_data and len(raw_data) > 0:
+                        imported_data = raw_data[0]
+                    else:
+                        imported_data = pd.DataFrame()
                         
-                    self.data = raw_data[target_index]
-                    
-                elif len(raw_data) == 1:
-                    self.data = raw_data[0]
                 else:
-                    self.data = []
-                if len(self.data) > 0:
-                    self.markers = list(self.data.columns)
-                    self.update_markers_grid()
-            else:
-                self.data = DataProcess.read_data(data_file)
-                self.markers = list(self.data.columns)
-                self.update_markers_grid()
-            if self.data is None or len(self.data) <= 0:
-                CTkMessagebox(title="Error", message=self.lang.get("read_data_error"), icon="cancel", option_1="OK")
-                return
-            if len(self.data) > 0:
-                self.data.columns = [str(col).strip().replace(" ", "_") for col in self.data.columns]
-                self.markers = list(self.data.columns)
-                self.update_markers_grid()
+                    raw_data = DataProcess.get_data(item)
 
-            self.update_record_table()
-            #remove empty columns button
+                    if len(raw_data) > 1:
+                        selector = TableSelector(self.root, raw_data)
+                        self.root.wait_window(selector)
+                        target_index = selector.selected_index
+
+                        if target_index is None:
+                            return
+                        imported_data = raw_data[target_index]
+                    # If there is only one table, use it without asking.
+                    elif len(raw_data) == 1:
+                        imported_data = raw_data[0]
+                    # If no tables were found, skip this file.
+                    else:
+                        imported_data = pd.DataFrame()
+            else:
+                imported_data = DataProcess.get_data(item)
+
+            if imported_data is None or imported_data.empty:
+                continue
+            if self.data is not None and not self.data.empty:
+                current_columns = [str(col).strip().replace(" ", "_") for col in self.data.columns]
+                
+                if current_columns != list(imported_data.columns):
+                    CTkMessagebox(
+                        title="Warning",
+                        message=f"The file {path.basename(item)} was skipped because its columns do not match the current markers.",
+                        icon="warning",
+                        option_1="OK",
+                    )
+                    continue
+
+                # Matching markers mean the new rows can be safely concatenated.
+                self.data = pd.concat([self.data, imported_data], ignore_index=True)
+            else:
+                # No data is loaded yet, so use this file as the starting dataset.
+                self.data = imported_data
+
             remove_empty_columns_button = ctt.CTkButton(master=self.data_frame, text=self.lang.get("remove_empty_columns"), command=self.remove_empty_columns)
             remove_empty_columns_button.grid(row=2, column=1, padx=5, pady=5, sticky="w")
-            
-            # Mostramos el nombre del archivo en la UI
+            # Show the imported file name in the UI.
             data_name_entry = ctt.CTkEntry(master=self.data_frame)
-            data_name_entry.insert(0, f"{path.basename(data_file)}")
+            data_name_entry.insert(0, f"{path.basename(item)}")
             data_name_entry.configure(state="readonly")
             data_name_entry.grid(row=1, column=1, sticky="ew")
+        clean_columns = []
+        for col in self.data.columns:
+            name = str(col).strip().replace(" ", "_")
+            name = name.replace(":", "")
+            clean_columns.append(name)
+        self.data.columns = clean_columns
+        self.markers = list(self.data.columns)
+        self.update_markers_grid()
+        self.update_record_table()
+
     def remove_empty_columns(self):
         if self.data is not None and not self.data.empty:
             #replace the empty values with nan
@@ -435,6 +469,8 @@ class MyApp:
     def remove_all_records(self):
         self.data = pd.DataFrame() 
         self.update_record_table()
+        self.remove_all_markers()
+        self.update_markers_grid()
     
     def add_record_manually(self):
         if(self.markers is None or len(self.markers) == 0):

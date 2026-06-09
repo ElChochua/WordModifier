@@ -18,7 +18,7 @@
         "markers": "Markers",
         "marker_cannot_be_empty": "Marker cannot be empty",
         "excel_detected": "Excel File Detected.",
-        "excel_file_row_input": "Please enter the row number of the table you want to use:",
+        "excel_file_row_input": "Please enter the row number of the table you want to use",
         "select_data_type": "Select Data Type",
         "invalid_number": "Invalid number. Please enter a valid number.",
         "no_data_imported": "No data imported. Please import data before adding records.",
@@ -32,7 +32,10 @@
         "no": "No",
         "unlock_document": "Unlock Document",
         "document_unlocked": "Document Unlocked",
-        "generate_documents": "Generate Documents"
+        "generate_documents": "Generate Documents",
+        "name": "Name",
+        "extract_from_markers": "Extract from Markers",
+        "no_markers_available": "No markers available. Please add markers before importing data."
     },
     "es":{
         "select_template": "Seleccionar Plantilla",
@@ -53,7 +56,7 @@
         "markers": "Marcadores",
         "marker_cannot_be_empty": "El marcador no puede estar vacío",
         "excel_detected": "Archivo de Excel Detectado.",
-        "excel_file_row_input": "Por favor, ingrese el número de fila de la tabla que desea usar:",
+        "excel_file_row_input": "Por favor, ingrese el número de fila de la tabla que desea usar",
         "select_data_type": "Seleccionar Tipo de Datos",
         "invalid_number": "Número inválido. Por favor, ingrese un número válido.",
         "no_data_imported": "No se importaron datos. Por favor, importe datos antes de agregar registros.",
@@ -67,6 +70,9 @@
         "no": "No",
         "unlock_document": "Desbloquear Documento",
         "document_unlocked": "Documento Desbloqueado",
-        "generate_documents": "Generar Documentos"
+        "generate_documents": "Generar Documentos",
+        "name": "Nombre",
+        "extract_from_markers": "Extraer de Marcadores",
+        "no_markers_available": "No hay marcadores disponibles. Por favor, agregue marcadores antes de importar datos."
     }
 }

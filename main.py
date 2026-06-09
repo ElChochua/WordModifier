@@ -5,6 +5,7 @@ from CTkMessagebox import CTkMessagebox
 import customtkinter
 import pandas as pd
 from Util import DataProcess
+from docx import Document
 root = customtkinter.CTk()
 
 def solve():
