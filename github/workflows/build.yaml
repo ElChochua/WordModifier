@@ -1,0 +1,17 @@
+name: Build Exe
+on: [workflow_dispatch]
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - run: pip install -r requirements.txt
+      - run: pip install pyinstaller
+      - run: pyinstaller --onefile --windowed --add-data "assets/;assets" --add-data "config/lang.json;config" main.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: app-exe
+          path: dist/*.exe

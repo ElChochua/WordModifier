@@ -1,4 +1,5 @@
 from docx import Document
+from docx.text.paragraph import Paragraph
 from pypdf import PdfWriter, PdfReader
 import os
 import subprocess
@@ -73,27 +74,19 @@ class FileManager:
 
 
     def replace_in_doc(self, doc, replacement):
-        for paragraph in doc.paragraphs:
-            self.replace_on_paragraph(paragraph, replacement)
-        for table in doc.tables:
-            for row in table.rows:
-                for cell in row.cells:
-                    for paragraph in cell.paragraphs:
-                        self.replace_on_paragraph(paragraph, replacement)
+        elements = [doc.element.body]
         for section in doc.sections:
-            for container in [
+            for container in (
                 section.header, section.first_page_header, section.even_page_header,
                 section.footer, section.first_page_footer, section.even_page_footer,
-            ]:
-                if container is None:
-                    continue
-                for paragraph in container.paragraphs:
-                    self.replace_on_paragraph(paragraph, replacement)
-                for table in container.tables:
-                    for row in table.rows:
-                        for cell in row.cells:
-                            for paragraph in cell.paragraphs:
-                                self.replace_on_paragraph(paragraph, replacement)
+                ):
+                    if container is not None:
+                        elements.append(container._element)
+        for root in elements:
+            for p_xml in root.iter(qn("w:p")):
+                paragraph = Paragraph(p_xml, doc)
+                self.replace_on_paragraph(paragraph, replacement)
+                            
 
 
     def generate_doc(self,template_path, name):
