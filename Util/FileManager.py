@@ -4,6 +4,8 @@ import os
 import subprocess
 import shutil
 import pandas as pd
+from docx.oxml.ns import qn
+
 """
     Generador de Cartas por Asesor
 
@@ -25,6 +27,37 @@ class FileManager:
         self.combined_pdf = combined_pdf
         self.markers = markers
 
+
+    def remove_protection(self, doc):
+        settings = doc.settings.element
+        for tag in ("w:documentProtection", "w:writeProtection"):
+            element = settings.find(qn(tag))
+            if element is not None:
+                settings.remove(element)
+
+    def unlock_document(self, doc_path, output_folder=None):
+
+        doc = Document(doc_path)
+        self.remove_protection(doc)
+
+        if output_folder is None:
+            output_path = doc_path
+        elif os.path.isdir(output_folder):
+            output_path = os.path.join(output_folder, os.path.basename(doc_path))
+        else:
+            output_path = output_folder
+
+        doc.save(output_path)
+        return output_path
+
+    def unlock_folder(self, folder_path):
+        unlocked = []
+        for file_name in os.listdir(folder_path):
+            if file_name.lower().endswith(".docx"):
+                path = os.path.join(folder_path, file_name)
+                self.unlock_document(path)
+                unlocked.append(path)
+        return unlocked
 
     def replace_on_paragraph(self,paragraph, replacement):
         full_text = "".join(run.text for run in paragraph.runs)

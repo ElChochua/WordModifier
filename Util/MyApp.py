@@ -61,7 +61,7 @@ class MyApp:
     def create_widgets(self):
         #header
         header_label = ctt.CTkLabel(master=self.header_frame, text="DocGen", font=ctt.CTkFont(size=24, weight="bold"))
-        unlock_doc_button = ctt.CTkButton(master=self.header_frame, text=self.lang.get("unlock_document"), command=lambda: CTkMessagebox(title=self.lang.get("error"), message=self.lang.get("no_template_selected"), icon="cancel", option_1=self.lang.get("ok")))   
+        unlock_doc_button = ctt.CTkButton(master=self.header_frame, text=self.lang.get("unlock_document"), command=self.unlock_document)
         generate_docs_button = ctt.CTkButton(master=self.header_frame, text=self.lang.get("generate_documents"), command=self.generate_documents)
         #header full width
         self.header_frame.grid_columnconfigure(0, weight=1) 
@@ -446,6 +446,17 @@ class MyApp:
         self.markers = list(self.data.columns)
         self.update_markers_grid()
         self.update_record_table()
+
+    def unlock_document(self):
+        if self.doc_path is None:
+            CTkMessagebox(title="Error", message=self.lang.get("no_template_selected"), icon="cancel", option_1="OK")
+            return
+        file_manager = FileManager(self.doc_path)
+        unlocked_path = file_manager.unlock_document(self.doc_path, self.output_folder)
+        if unlocked_path:
+            CTkMessagebox(title="Success", message=self.lang.get("document_unlocked").format(unlocked_path=unlocked_path), icon="check", option_1="OK")
+        else:
+            CTkMessagebox(title="Error", message=self.lang.get("document_unlock_failed"), icon="cancel", option_1="OK")
 
     def remove_empty_columns(self):
         if self.data is not None and not self.data.empty:
