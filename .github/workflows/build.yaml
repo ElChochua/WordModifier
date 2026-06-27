@@ -10,7 +10,7 @@ jobs:
           python-version: '3.13'
       - run: pip install -r requirement.txt
       - run: pip install pyinstaller
-      - run: pyinstaller --onefile --windowed --add-data "assets/;assets" --add-data "config/lang.json;config" main.py
+      - run: pyinstaller --onefile --windowed --add-data "assets/;assets" --add-data "Util/config/lang.json;config" main.py
       - uses: actions/upload-artifact@v4
         with:
           name: app-exe
